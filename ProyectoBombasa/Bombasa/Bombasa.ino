@@ -8,16 +8,16 @@ const int Vmax = 20;
 
 // Se asocian los pines con su función
 //Motor
-const int en = 3;
+const int en1 = 3;
 const int in1 = 7;
 const int in2 = 4;
 
-int velMotor = 0;
+//Elección
+int ultimo_estado = 0;
 
-//Botones modo manual
+//Modo manual
 const int botonUp = 13;
 const int botonDown = 12;
-
 int estado_botonDown = 0;
 int buttonState = 0;
 int lastButtonState = 0;
@@ -26,11 +26,32 @@ int ultimo_estadoDown = 0;
 
 //Modo automático
 const int Labjack = A0;
-float valor;
+
 
 //Pantalla 7 segmentos 4 dígitos
 #define CLK 11
 #define DIO 10
+
+const uint8_t SEG_MAN[] = {
+  SEG_E | SEG_F | SEG_A | SEG_B | SEG_C,                    // M
+  SEG_F | SEG_A | SEG_B | SEG_C | SEG_E,                    // 
+  SEG_C | SEG_E | SEG_G | SEG_F | SEG_A | SEG_B,            // A
+  SEG_F | SEG_A | SEG_E | SEG_F | SEG_B | SEG_C,            // N
+};
+
+const uint8_t SEG_AUTO[] = {
+  SEG_C | SEG_E | SEG_G | SEG_F | SEG_A | SEG_B,            // A
+  SEG_E | SEG_F | SEG_D | SEG_B | SEG_C,                    // U
+  SEG_A | SEG_B | SEG_C,                                    // T
+  SEG_A | SEG_E | SEG_F | SEG_B | SEG_C | SEG_D,            // O
+};
+
+const uint8_t SEG_OCHO[] = {
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+};
 
 TM1637Display display(CLK, DIO);
 
@@ -45,12 +66,15 @@ void setup() {
   pinMode(botonUp, INPUT);
   pinMode(botonDown, INPUT);
 
-  pinMode(en, OUTPUT);
+  pinMode(en1, OUTPUT);
   pinMode(in1, OUTPUT);
   pinMode(in2, OUTPUT);
 
 
-display.setBrightness(0x0f); //Limpia la pantalla
+  display.clear(); //Limpia la pantalla
+  display.setBrightness(0x0f); 
+  display.setSegments(SEG_OCHO);
+  delay(1);
 }
 
 void loop() {
@@ -59,31 +83,43 @@ void loop() {
   // Inicialmente se toma el estado del interruptor y se ejecuta el modo MANUAL
   // o AUTO en función de su posición
   eleccion();
-
-  //En cualquier momento el cambio del interruptor interrumpe el programa y
-  // se vuelve a comprobar el estado para ejecutar el modo correspondiente
-
-
-
-
 }
+
+
+
+
+
 void eleccion() {
+
+  
   estado_interruptor = digitalRead(interruptor);
 
   if (estado_interruptor == HIGH) {
     //Entonces el interruptor está en modo AUTOMÁTICO
-    
-    //                                                                          Serial.println("AUTOMATICO");
+    if(ultimo_estado != estado_interruptor){
+      display.setSegments(SEG_AUTO);
+    }                                                                       Serial.println("AUTOMATICO");
     
     automatico();
+    
   } else {
     //Entonces el interruptor está en modo MANUAL
     manual();
+    if(ultimo_estado != estado_interruptor){
+      display.setSegments(SEG_MAN);
+    }                          
   }
+  
+  ultimo_estado = estado_interruptor;
 }
+
+
+
+
 
 void manual() {
   int value = 0;
+  
     // read the pushbutton input pin:
   buttonState = digitalRead(botonUp);
   // compare the buttonState to its previous state
@@ -126,111 +162,80 @@ void manual() {
   ultimo_estadoDown = estado_botonDown;
 
     
-    //value = map(buttonPushCounter, 0, Vmax, 0, 255);
-    //Serial.print("Lo que se le mete al motor: ");
-    //Serial.println(value);
-    digitalWrite(in1, HIGH);
-    digitalWrite(in2, LOW);
-    value = map(buttonPushCounter, 0, 25.5, 0, 255);
-    Serial.println(value);
-    analogWrite(en, value);
+    MoverMotor(buttonPushCounter);
 }
 
+
+
+
+
 void automatico() {
-  int valor;
+  float valor = 0;
+  int value = 0;
+  int lastValue = 0;
 
-
-  if (analogRead(Labjack) > 0.1) {
+  
+  
+  value = analogRead(Labjack);
+  if (analogRead(Labjack) > 0.1 && value != lastValue) {
     //Se toman las referencias a partir del Labjack
     valor = analogRead(Labjack); //0-5V
     Serial.println("Labjack funsionando papi");
     Serial.println();
     Serial.print("El valor introducido es: ");   
-    
     Serial.println(valor);
     
-    valor = map(valor, 0, 1024, 0, 255); 
-
-    Serial.print("El valor introducido mapeado es: "); 
-    Serial.println(valor);
-    
-    
-
-    digitalWrite(in1, HIGH);
-    digitalWrite(in2, LOW);
-    //valor = map(valor, 0, Vmax, 0, 255);
-    analogWrite(en,valor);
-
+    MoverMotor(valor);
 
   } else {
-
-    // Serial.println("Estamos en serie bebé");
-     //Se toman las entradas del puerto serie
   
-  Serial.println("Introduzca un valor de 0 - 1024 (resolución de la salida analog) ");
+    if (Serial.available() > 0) {
+      Serial.println("Introduzca un valor de 0 - 1024 (resolución de la salida analog) ");
+      String str = Serial.readStringUntil('\n'); //lectura de la entrada de varios dígitos
+      float valor = str.toFloat();
 
+      if (valor>0 && valor <=20){
 
-  while (Serial.available() <= 0) {
-  String str = Serial.readStringUntil('\n'); //lectura de la entrada de varios dígitos
-  float valor = str.toFloat();
-  // valor=Serial.read() - '0'; // lectura de un dígito en ASCII
-
-  if (valor>0 && valor <=20){
-
+        //Mover_motor
+        MostrarPantalla(valor);
+        MoverMotor(valor);
 
 
     
-    int entera = 0;
-    int decimal = 0;
-    //leemos la opcion enviada
-    entera = (int)(valor);
-    decimal = 10 * (valor - entera);
-
-    Serial.println(entera);
-    Serial.println(decimal);
+        Serial.println();
+        Serial.print("El valor introducido es: ");   
     
-    display.setBrightness(0x0f); 
-    display.showNumberDec(entera,false,2,0); 
-    display.setBrightness(0x0f); 
-    display.showNumberDec(decimal,false,1,3);
-    
-   
-
-    
-    Serial.println();
-    Serial.print("El valor introducido es: ");   
-    
-    Serial.println(valor);
-
-    
-      
-    
-    
-    
-
-    digitalWrite(in1, HIGH);
-    digitalWrite(in2, LOW);
-    //valor = map(valor, 0, Vmax, 0, 255);
-    analogWrite(en,valor);
-
-
+        Serial.println(valor);
+      }
+    }
   }
-
-  }
-  
-    
-
-
-
-}
 
 }
 
 
 
-//Para activar el motor hacia delante
+void MostrarPantalla(float valor){
 
-//    digitalWrite(in1, HIGH);
-//    digitalWrite(in2, LOW);
-//    valor=map(valor, 0,Vmax, 0, 255)
-//    AnalogWrite(valor, en)
+  int entera = 0;
+  int decimal = 0;
+
+  //Ajuste de número real para separarlo en dos enteros de parte real e imaginaria
+  entera = (int)(valor);
+  decimal = 100 * (valor - entera); 
+
+  //Representación en pantalla del número real
+    display.clear(); //Limpia la pantalla
+    display.setBrightness(0x0f); 
+    display.showNumberDecEx(entera,(0x80 >> 1),false,2,0); 
+    display.showNumberDecEx(decimal,(0x80 >> 1),false,2,2); 
+}
+
+
+void MoverMotor(float valor){
+
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  valor = map(valor, 0, Vmax, 0, 255);
+  analogWrite(en1,valor);
+  
+}

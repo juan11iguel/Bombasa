@@ -14,8 +14,6 @@ TM1637Display display(CLK, DIO);
 
 void setup() {
   Serial.begin(9600);
-  pinMode(botonUp, INPUT);
-  pinMode(botonDown, INPUT);
 
 }
 
@@ -59,5 +57,6 @@ void MostrarPantalla(float valor){
   //Representación en pantalla del número real
   display.setBrightness(0x0f); 
   display.showNumberDec(entera,false,2,0); 
+  display.setBrightness(0x0f); 
   display.showNumberDec(decimal,false,1,3);
 }
