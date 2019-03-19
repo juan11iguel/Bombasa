@@ -59,12 +59,15 @@ TM1637Display display(CLK, DIO);
 const int interruptor = 2;
 int estado_interruptor = 0;
 
+
+
 void setup() {
   // Asignación de entradas y salidas
   Serial.begin(9600);
   pinMode(interruptor, INPUT);
   pinMode(botonUp, INPUT);
   pinMode(botonDown, INPUT);
+
 
   pinMode(en1, OUTPUT);
   pinMode(in1, OUTPUT);
