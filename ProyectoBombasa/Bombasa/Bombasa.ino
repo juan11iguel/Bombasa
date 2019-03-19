@@ -80,8 +80,6 @@ void setup() {
 void loop() {
 
   // ELECCIÓN MANUAL - AUTOMÁTICO
-  // Inicialmente se toma el estado del interruptor y se ejecuta el modo MANUAL
-  // o AUTO en función de su posición
   eleccion();
 }
 
@@ -98,8 +96,7 @@ void eleccion() {
     //Entonces el interruptor está en modo AUTOMÁTICO
     if(ultimo_estado != estado_interruptor){
       display.setSegments(SEG_AUTO);
-    }                                                                       Serial.println("AUTOMATICO");
-    
+    }                                                             
     automatico();
     
   } else {
