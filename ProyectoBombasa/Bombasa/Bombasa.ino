@@ -8,24 +8,24 @@ const int Vmax = 20;
 
 // Se asocian los pines con su función
 //Motor
-const int en1 = 3;
-const int in1 = 7;
-const int in2 = 4;
+const int en1 = 3;      // PWM  Salida (0 - 255) bits -> (0 - 5) V
+const int in1 = 7;      // Eneable Salida
+const int in2 = 4;      // Eneable Salida PWM pero la utilzaremos como digital   
 
 //Elección
 int ultimo_estado = 0;
 
 //Modo manual
-const int botonUp = 13;
-const int botonDown = 12;
-int estado_botonDown = 0;
-int buttonState = 0;
-int lastButtonState = 0;
-int buttonPushCounter = 0;
-int ultimo_estadoDown = 0;
+const int botonUp = 13;     // Subir valor motor Entrada digital
+const int botonDown = 12;   // Bajar valor motor Entrada digital
+int estado_botonDown = 0;   // Inicializar
+int buttonState = 0;        // Inicializar
+int lastButtonState = 0;    // Inicializar
+int buttonPushCounter = 0;  // Inicializar
+int ultimo_estadoDown = 0;  // Inicializar
 
 //Modo automático
-const int Labjack = A0;
+const int Labjack = A0;     // Entrada Analógica para motor1 (0-1023) bits -> (0 - 5) V
 
 
 //Pantalla 7 segmentos 4 dígitos
@@ -170,7 +170,7 @@ void manual() {
 
 
 void automatico() {
-  float valor = 0;
+  float valor = 0;  // valor de salida Analógica para motor1. Inicializar
   int value = 0;
   int lastValue = 0;
 
