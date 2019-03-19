@@ -221,7 +221,7 @@ void MostrarPantalla(float valor){
 
   //Ajuste de número real para separarlo en dos enteros de parte real e imaginaria
   entera = (int)(valor);
-  decimal = 100 * (valor - entera); 
+  decimal = round(100 * (valor - entera)); 
 
   //Representación en pantalla del número real
     display.clear(); //Limpia la pantalla
