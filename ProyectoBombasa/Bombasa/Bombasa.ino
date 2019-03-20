@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <TM1637Display.h>
+#include <PID_v1.h>
 
 
 const int Vmax = 20;
@@ -23,6 +24,7 @@ int buttonState = 0;        // Inicializar
 int lastButtonState = 0;    // Inicializar
 int buttonPushCounter = 0;  // Inicializar
 int ultimo_estadoDown = 0;  // Inicializar
+
 
 //Modo automático
 const int Labjack = A0;     // Entrada Analógica para motor1 (0-1023) bits -> (0 - 5) V
@@ -58,6 +60,8 @@ TM1637Display display(CLK, DIO);
 //Interruptor MANUAL - AUTOMÁTICO
 const int interruptor = 2;
 int estado_interruptor = 0;
+
+
 
 
 
@@ -161,6 +165,7 @@ void manual() {
   // save the current state as the last state, for next time through the loop
   ultimo_estadoDown = estado_botonDown;
 
+
     
     MoverMotor(buttonPushCounter);
 }
@@ -235,7 +240,14 @@ void MoverMotor(float valor){
 
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
-  valor = map(valor, 0, Vmax, 0, 255);
-  analogWrite(en1,valor);
+  if(valor == 0){
+    analogWrite(en1,valor);
+  }else{
+    valor = map(valor, 0, 20, 4.4, 25.4);
+    valor = map(valor, 4.4, 25.4, 37.4, 255);
+    analogWrite(en1,valor);
+  }
+
+  
   
 }
