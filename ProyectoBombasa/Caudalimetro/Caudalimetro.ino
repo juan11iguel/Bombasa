@@ -78,7 +78,7 @@ int variacion;
 
 
 //Lectura Voltaje
-int voltaje = A1;
+int voltaje = A3;
 float V;
 
 void setup() {
@@ -104,12 +104,10 @@ void loop() {
 
   // ELECCIÓN MANUAL - AUTOMÁTICO
   eleccion();
-  f=leerCaudal();
-  V=analogRead(A1);
-  V=map(V, 0,1023, 0,30);
-  Serial.print("Voltaje enviado al motor: ");
-  Serial.println(V);
-  delay(500);
+  //f=leerCaudal();
+  
+  leerVoltaje();
+  
 }
 
 
@@ -214,7 +212,7 @@ void automatico() {
     
     MoverMotor(valor);
 
-  } else {
+  } else { 
   
     if (Serial.available() > 0) {
       Serial.println("Introduzca un valor de 0 - 1024 (resolución de la salida analog) ");
@@ -305,4 +303,21 @@ float leerCaudal(){
   
   return frecuencia;
   
+}
+
+void leerVoltaje(){
+int voltaje;
+float VOL;
+  tiempo=millis();
+
+  if(tiempo - ultimo_tiempo > 2000){
+      voltaje=analogRead(A1);
+      VOL=voltaje*(5/1023);
+      Serial.print("Voltaje enviado al motor: ");
+      Serial.println(VOL);
+
+
+      ultimo_tiempo = tiempo;
+  }
+
 }
