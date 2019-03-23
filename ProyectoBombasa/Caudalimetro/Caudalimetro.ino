@@ -1,72 +1,74 @@
 
-//Programa para el control de la bomba en bucle abierto
+//  Programa para el control de la bomba en bucle cerrado
 
+//  Inclusión de todas las librerías necesarias
 #include <Arduino.h>
 #include <TM1637Display.h>
 #include <PID_v1.h>
-
+/////////////////////////////////////////////
 
 const int Vmax = 20;
 
 // Se asocian los pines con su función
-//Motor
+//  Motor
 const int en1 = 3;      // PWM  Salida (0 - 255) bits -> (0 - 5) V
-const int in1 = 7;      // Eneable Salida
-const int in2 = 4;      // Eneable Salida PWM pero la utilzaremos como digital   
+const int in1 = 7;      // Entrada lógica del driver para controlar el sentido de giro del motor
+const int in2 = 4;      // Entrada lógica del driver para controlar el sentido de giro del motor
 
-//Elección
+//  Elección
 int ultimo_estado = 0;
 
-//Modo manual
-const int botonUp = 13;     // Subir valor motor Entrada digital
-const int botonDown = 12;   // Bajar valor motor Entrada digital
-int estado_botonDown = 0;   // Inicializar
-int buttonState = 0;        // Inicializar
-int lastButtonState = 0;    // Inicializar
-int buttonPushCounter = 0;  // Inicializar
-int ultimo_estadoDown = 0;  // Inicializar
+//  Modo manual
+const int botonUp = 13;     // Boton Subir (el de al lado de la pantalla)
+const int botonDown = 12;   // Boton Bajar (el de al lado de la pantalla)
+int estado_botonDown = 0;   // Estado actual del botón bajar
+int buttonState = 0;        // Estado actual del botón subir
+int lastButtonState = 0;    // Estado anterior del botón subir
+int ultimo_estadoDown = 0;  // Estado anterior del botón bajar
+int buttonPushCounter = 0;  // Contador de número de pulsaciones (subir suma, bajar resta)
+
+//  Modo automático
+const int Labjack = A4;     // Entrada del Labjack para controlar el motor (0-1023) bits -> (0 - 5) V
 
 
-//Modo automático
-const int Labjack = A0;     // Entrada Analógica para motor1 (0-1023) bits -> (0 - 5) V
-
-
-//Pantalla 7 segmentos 4 dígitos
-#define CLK 11
-#define DIO 10
-
-const uint8_t SEG_MAN[] = {
+//Pantalla 7 segmentos 4 dígitos/////////////////////////////////
+/////////////////////////////////////////////////////////////////
+#define CLK 11                                              /////
+#define DIO 10                                              /////
+                                                            /////
+const uint8_t SEG_MAN[] = {                                 /////
   SEG_E | SEG_F | SEG_A | SEG_B | SEG_C,                    // M
   SEG_F | SEG_A | SEG_B | SEG_C | SEG_E,                    // 
   SEG_C | SEG_E | SEG_G | SEG_F | SEG_A | SEG_B,            // A
   SEG_F | SEG_A | SEG_E | SEG_F | SEG_B | SEG_C,            // N
-};
-
-const uint8_t SEG_AUTO[] = {
+};                                                          /////
+                                                            /////
+const uint8_t SEG_AUTO[] = {                                /////
   SEG_C | SEG_E | SEG_G | SEG_F | SEG_A | SEG_B,            // A
   SEG_E | SEG_F | SEG_D | SEG_B | SEG_C,                    // U
   SEG_A | SEG_B | SEG_C,                                    // T
   SEG_A | SEG_E | SEG_F | SEG_B | SEG_C | SEG_D,            // O
-};
+};                                                          /////
+                                                            /////
+const uint8_t SEG_OCHO[] = {                                /////
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
+};                                                          /////
+                                                            /////
+TM1637Display display(CLK, DIO);                            /////
+/////////////////////////////////////////////////////////////////
 
-const uint8_t SEG_OCHO[] = {
-  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
-  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
-  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
-  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
-};
-
-TM1637Display display(CLK, DIO);
-
-//Interruptor MANUAL - AUTOMÁTICO
+//  Interruptor MANUAL - AUTOMÁTICO
 const int interruptor = 2;
 int estado_interruptor = 0;
 
 
-//Caudalímetro Contador
+//  Caudalímetro Contador
 int caudalimetro = 8;
 
-//Variables para la función leer caudal
+//  Variables para la función leer caudal
 int contador = 0;
 int ultimo_estadoo = 0;
 int estado;
@@ -77,10 +79,12 @@ int conteo = 0;
 int variacion;
 
 
-//Lectura Voltaje
-int voltaje = A3;
+//  Lectura Voltaje
+int lectura_Voltaje = A5;
 float V;
 
+
+//  Sólo se ejecuta una vez, establece la configuración inicial
 void setup() {
   // Asignación de entradas y salidas
   Serial.begin(9600);
@@ -98,8 +102,14 @@ void setup() {
   display.setBrightness(0x0f); 
   display.setSegments(SEG_OCHO);
   delay(1);
+  
+  if(digitalRead(interruptor == 1)){    //Para que si el sistema se inicia en modo AUTO
+     ultimo_estado = 1;                 //el ultimo_estado lo refleje y represente el 8888.
+  }
 }
 
+
+// Se ejecuta continuamente, se incluyen aquí todas las tareas a realizar
 void loop() {
 
   // ELECCIÓN MANUAL - AUTOMÁTICO
@@ -113,7 +123,7 @@ void loop() {
 
 
 
-
+//  Procedimiento que lee el estado del interruptor y lleva el programa al modo AUTO o MANUAL
 void eleccion() {
 
   
@@ -140,7 +150,7 @@ void eleccion() {
 
 
 
-
+// Subprograma que contiene el modo MANUAL
 void manual() {
   int value = 0;
   
@@ -193,7 +203,7 @@ void manual() {
 
 
 
-
+//  Subprograma que contiene el modo automático
 void automatico() {
   float valor = 0;  // valor de salida Analógica para motor1. Inicializar
   int value = 0;
@@ -219,11 +229,11 @@ void automatico() {
       String str = Serial.readStringUntil('\n'); //lectura de la entrada de varios dígitos
       float valor = str.toFloat();
 
-      if (valor>0 && valor <=20){
+      if (valor>=0 && valor <=100){
 
         //Mover_motor
         MostrarPantalla(valor);
-        MoverMotor(valor);
+        MoverMotorSerial(valor);
 
 
     
@@ -239,6 +249,7 @@ void automatico() {
 
 
 
+//  Subprograma para la representación en pantalla de números reales con hasta dos decimales
 void MostrarPantalla(float valor){
 
   int entera = 0;
@@ -256,6 +267,7 @@ void MostrarPantalla(float valor){
 }
 
 
+//  Subprograma para el movimiento del motor en modo manual
 void MoverMotor(float valor){
 
   digitalWrite(in1, HIGH);
@@ -263,16 +275,29 @@ void MoverMotor(float valor){
   if(valor == 0){
     analogWrite(en1,valor);
   }else{
-    valor = map(valor, 0, 20, 4.4, 25.4);
+    valor = map(valor, 0, 27.4, 4.4, 22);
     valor = map(valor, 4.4, 25.4, 37.4, 255);
     analogWrite(en1,valor);
   }
 
   
+//  Subprograma para el movimiento del motor en modo automático, por el puerto serie
+}
+
+void MoverMotorSerial(float valor){
+
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+
+    valor = map(valor, 0, 100, 0, 28);
+    valor = map(valor, 0, 28, 0, 255);
+    analogWrite(en1,valor);
+  
   
 }
 
 
+//  Función para realizar la lectura del caudalímetro contador y asociarla al caudal correspondiente
 float leerCaudal(){
   float frecuencia;
   
@@ -305,18 +330,33 @@ float leerCaudal(){
   
 }
 
+//  Subprograma que lee el voltaje enviado el motor, a través del divisor de tensión para adaptarla
+//  al rango de entrada del puerto analógico del arduino
+
 void leerVoltaje(){
-int voltaje;
-float VOL;
+int voltaje[5];
+
   tiempo=millis();
 
-  if(tiempo - ultimo_tiempo > 2000){
-      voltaje=analogRead(A1);
-      VOL=voltaje*(5/1023);
-      Serial.print("Voltaje enviado al motor: ");
-      Serial.println(VOL);
+  if(tiempo - ultimo_tiempo > 10){
 
+      V=analogRead(A5);
 
+      if( V != 0 && V != 1023){
+       
+      }
+
+  if(tiempo - ultimo_tiempo > 1000){
+    
+  }
+      
+      if( V != 0 && V != 1023){
+        Serial.print("Voltaje enviado al motor: ");
+        Serial.println(V);
+      
+      }
+      
+//(V <800 || V> 850)&&
       ultimo_tiempo = tiempo;
   }
 
