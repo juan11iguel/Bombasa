@@ -64,31 +64,35 @@ TM1637Display display(CLK, DIO);                            /////
 const int interruptor = 2;
 int estado_interruptor = 0;
 
-
-//  Caudalímetro Contador
-int caudalimetro = 8;
-
-//  Variables para la función leer caudal
-int contador = 0;
+//  Lectura Caudal
+const int caudalimetro = 8;
+int nmedidas = 0;
+int estadoo = 0;
+int tiempoo = 0;
 int ultimo_estadoo = 0;
-int estado;
-int tiempo;
-int ultimo_tiempo = 0;
-float f;
-int conteo = 0;
-int variacion;
-
+int ultimo_tiempoo = 0;
+float frecuencia;
+float F[100];
+float Fmedia;
 
 //  Lectura Voltaje
 
-int V;
-int nlecturas=1;
-int voltaje[100];
-int suma;
-float Vmedio;
+int tiempo;
+int ultimo_tiempo;
+int V;            //Variable que almacena la lectura instantánea del voltaje
+int nlecturas=1;  //Almacena el número de lecturas (100 lecturas)
+int voltaje[100]; //Almacena el valor de V para las nlecturas   
+float Vmedio;     //Voltaje medio de las nlecturas
+
+//  Controlador
+float salida_V = 0; //Salida del sensor del voltaje enviado al motor
+float salida_Q = 0; //Salida del sensor del caudal propulsado
+float Kp = 0, Ti = 0, referencia = 0;
 
 
-
+//  Variables auxiliares que se comparten en distintos subprogramas
+int i;
+float suma;
 
 
 //  Sólo se ejecuta una vez, establece la configuración inicial
@@ -121,9 +125,10 @@ void loop() {
 
   // ELECCIÓN MANUAL - AUTOMÁTICO
   eleccion();
-  //f=leerCaudal();
-
-  leerVoltaje();
+  
+  
+  //salida_Q = leerCaudal();
+  salida_V = leerVoltaje();
 
 }
 
@@ -304,67 +309,71 @@ void MoverMotorSerial(float valor) {
 }
 
 
+
 //  Función para realizar la lectura del caudalímetro contador y asociarla al caudal correspondiente
+//Pendiente, asociar valor de frecuencia con el caudal correspondiente
 float leerCaudal() {
-  float frecuencia;
-
-
-  tiempo = millis();
-
-  estado = digitalRead(caudalimetro);
-
-
-  if (estado == HIGH && estado != ultimo_estadoo) {
-    Serial.println("Hola");
-
-    variacion = tiempo - ultimo_tiempo;
-    frecuencia = 1 / variacion;
-
-    Serial.print("freq:");
-    Serial.println(frecuencia);
-    Serial.print("estado: ");
-    Serial.println(estado);
-    Serial.print("contador: ");
-    Serial.println(contador);
-    contador++;
-
-  }
-  ultimo_estadoo = estado;
-  ultimo_tiempo = tiempo;
-
   
+  tiempoo = millis();
 
+  estadoo = digitalRead(caudalimetro);
+  if (estadoo == HIGH && estadoo != ultimo_estadoo) { //Cada vez que completa una vuelta se cumple la condición
+                                                      //Lectura instantánea del caudal
+    frecuencia = 1/(1000*(tiempoo - ultimo_tiempoo)); //Se calcula la frecuencia de rotación en Hz
+  }
+  
+  if(nmedidas <= 100){                                //Media de las últimas N medidas
+    F[nmedidas] = frecuencia;
+    nmedidas++;
+  }else{
+    suma = 0;
+    for(i=0; i<nmedidas; i++){ 
+      suma=suma+F[i];
+    }
+    Fmedia = suma/nmedidas;
+    nmedidas = 0;
+  }
 
-  return frecuencia;
+  if (tiempo - ultimo_tiempo > 1000) {  //Representación en pantalla
+    Serial.print("Caudal: ");
+    Serial.println(Fmedia);
+  }
 
+  ultimo_estadoo = estadoo;
+  ultimo_tiempoo = tiempoo;
+
+  return Fmedia;
 }
+
+
 
 //  Subprograma que lee el voltaje enviado el motor, a través del divisor de tensión para adaptarla
 //  al rango de entrada del puerto analógico del arduino
-
-
-void leerVoltaje() {
+float leerVoltaje() {
   
-
   tiempo = millis();
   V = analogRead(A5);
   if(nlecturas <= 100){
     if ( V != 0 && V != 1023) {
-      voltaje[nlecturas] = analogRead(A5);  //Se almacenan las lecturas tomadas durante un ms
+      voltaje[nlecturas] = V;       //Se almacenan las lecturas tomadas durante un ms
       nlecturas++;   
     }
-  }else{  //Se han tomado y almacenado las medidas
-    suma=0; //Cálculo de la media de las medidas tomadas en el intervalo
+  }else{                            //Se han tomado y almacenado las N medidas
+    suma=0;                         //Cálculo de la media de las medidas tomadas en el intervalo
     for(i=0; i<nlecturas; i++){ 
       suma=suma+voltaje[i];
     }
     Vmedio = suma/nlecturas;
     Vmedio = Vmedio * (Vmax/1023);  //Se pasa de bits a Voltios, Vmax cambia en función del valor máximo
+    nlecturas = 0;                  //Se resetea el contador de lecturas realizadas
   }
-      if (tiempo - ultimo_tiempo > 1000) {
-       Serial.print("Voltaje enviado al motor: ");
-       Serial.println(Vmedio);
-      }
+  
+  if (tiempo - ultimo_tiempo > 1000) {  //Representación en pantalla
+    Serial.print("Voltaje enviado al motor: ");
+    Serial.println(Vmedio);
+  }
    
     ultimo_tiempo = tiempo;
+
+    return Vmedio;
 }
