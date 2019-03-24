@@ -5,8 +5,10 @@
 #include <Arduino.h>
 #include <TM1637Display.h>
 #include <PID_v1.h>
-/////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//Definición e inicialización de variables
 const int Vmax = 30;
 
 // Se asocian los pines con su función
@@ -66,14 +68,14 @@ int estado_interruptor = 0;
 
 //  Lectura Caudal
 const int caudalimetro = 8;
-int nmedidas = 0;
+int nmedidas = 0;   //Almacena el número de lecturas (100 lecturas)
 int estadoo = 0;
 int tiempoo = 0;
 int ultimo_estadoo = 0;
 int ultimo_tiempoo = 0;
-float frecuencia;
-float F[100];
-float Fmedia;
+float frecuencia;   //Variable que almacena la lectura instantánea del voltaje
+float F[100];       //Almacena el valor de frecuencia para las nmedidas   
+double Fmedia;      //Frecuencia media de las nlecturas
 
 //  Lectura Voltaje
 
@@ -82,18 +84,37 @@ int ultimo_tiempo;
 int V;            //Variable que almacena la lectura instantánea del voltaje
 int nlecturas=1;  //Almacena el número de lecturas (100 lecturas)
 int voltaje[100]; //Almacena el valor de V para las nlecturas   
-float Vmedio;     //Voltaje medio de las nlecturas
+double Vmedio;    //Voltaje medio de las nlecturas
 
 //  Controlador
-float salida_V = 0; //Salida del sensor del voltaje enviado al motor
-float salida_Q = 0; //Salida del sensor del caudal propulsado
-float Kp = 0, Ti = 0, referencia = 0;
+double salida_V = 0; //Salida del sensor del voltaje enviado al motor
+double salida_Q = 0; //Salida del sensor del caudal propulsado
+double sc_V;         //Señal de control para el voltaje
+double sc_Q;         //Señal de control para el caudal
+double referencia_V; //Referecia para el voltaje
+double referencia_Q; //Referencia para el caudal
+double Setpoint, Input, Output;
+//Parámetros del controlador de voltaje. PARALELO
+float Kp_V;
+float Ki_V;
+float Kd_V;
+//Parámetros del controlador de caudal.  PARALEO
+float Kp_Q;
+float Ki_Q;
+float Kd_Q;
 
+PID ControlVoltaje(&Input, &Output, &Setpoint,Kp_V,Ki_V,Kd_V, DIRECT);
+//PID ControlCaudal(&Input, &Output, &Setpoint,Kp_Q,Ki_Q,Kd_Q, DIRECT);
 
 //  Variables auxiliares que se comparten en distintos subprogramas
 int i;
 float suma;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//Programas y subprogramas
 
 //  Sólo se ejecuta una vez, establece la configuración inicial
 void setup() {
@@ -109,14 +130,20 @@ void setup() {
   pinMode(in2, OUTPUT);
 
 
-  display.clear(); //Limpia la pantalla
+  display.clear();                      //Limpia la pantalla
   display.setBrightness(0x0f);
   display.setSegments(SEG_OCHO);
   delay(1);
 
   if (digitalRead(interruptor == 1)) {  //Para que si el sistema se inicia en modo AUTO
-    ultimo_estado = 1;                 //el ultimo_estado lo refleje y represente el 8888.
+    ultimo_estado = 1;                  //el ultimo_estado lo refleje y represente el 8888.
   }
+
+  //ControlVoltaje.SetOutputLimits(0,100);
+  //ControlCaudal.SetOutputLimits(0,100);
+  
+  //ControlVoltaje.SetMode(AUTOMATIC);  //Activación de controladores
+  //ControlCaudal.SetMode(AUTOMATIC);   //Probablemente debería de ir dentro de elección para ver si activar o no el controlador
 }
 
 
@@ -127,8 +154,13 @@ void loop() {
   eleccion();
   
   
-  //salida_Q = leerCaudal();
-  salida_V = leerVoltaje();
+  //salida_Q = leerCaudal();            //Medida del caudal
+  //salida_V = leerVoltaje();           //Medida del voltaje enviado al motor
+
+  //MostrarPantallaOscilante(double salida_Q, salida_V); //Que vaya cambiando la pantalla entre mostrar caudal y voltaje enviado.
+
+  //ControlVoltaje.Compute();           //Se calcula la señal de control de voltaje                     
+  //ControlCaudal.Compute();            //Señal de control de caudal
 
 }
 
@@ -301,8 +333,7 @@ void MoverMotorSerial(float valor) {
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
 
-  valor = map(valor, 0, 100, 0, 28);
-  valor = map(valor, 0, 28, 0, 255);
+  valor = map(valor, 0, 100, 0, 255);
   analogWrite(en1, valor);
 
 
