@@ -13,6 +13,7 @@ const int Vmax = 30;
 
 // Se asocian los pines con su función
 //  Motor
+void MoverMotor(float valor);
 const int en1 = 3;      // PWM  Salida (0 - 255) bits -> (0 - 5) V
 const int in1 = 7;      // Entrada lógica del driver para controlar el sentido de giro del motor
 const int in2 = 4;      // Entrada lógica del driver para controlar el sentido de giro del motor
@@ -78,7 +79,7 @@ float F[100];       //Almacena el valor de frecuencia para las nmedidas
 double Fmedia;      //Frecuencia media de las nlecturas
 
 //  Lectura Voltaje
-
+double leerVoltaje();
 int tiempo;
 int ultimo_tiempo;
 int V;            //Variable que almacena la lectura instantánea del voltaje
@@ -139,10 +140,10 @@ void setup() {
     ultimo_estado = 1;                  //el ultimo_estado lo refleje y represente el 8888.
   }
 
-  //ControlVoltaje.SetOutputLimits(0,100);
+  ControlVoltaje.SetOutputLimits(0,100);
   //ControlCaudal.SetOutputLimits(0,100);
   
-  //ControlVoltaje.SetMode(AUTOMATIC);  //Activación de controladores
+  ControlVoltaje.SetMode(AUTOMATIC);  //Activación de controladores
   //ControlCaudal.SetMode(AUTOMATIC);   //Probablemente debería de ir dentro de elección para ver si activar o no el controlador
 }
 
@@ -154,13 +155,18 @@ void loop() {
   eleccion();
   
   
-  //salida_Q = leerCaudal();            //Medida del caudal
-  //salida_V = leerVoltaje();           //Medida del voltaje enviado al motor
+  //salida_Q = leerCaudal();          //Medida del caudal
+  salida_V = leerVoltaje();           //Medida del voltaje enviado al motor
 
   //MostrarPantallaOscilante(double salida_Q, salida_V); //Que vaya cambiando la pantalla entre mostrar caudal y voltaje enviado.
+  
+  Setpoint = referencia_V;
+  Input = salida_V;
+  
+  ControlVoltaje.Compute();           //Se calcula la señal de control de voltaje                     
+  //ControlCaudal.Compute();          //Señal de control de caudal
 
-  //ControlVoltaje.Compute();           //Se calcula la señal de control de voltaje                     
-  //ControlCaudal.Compute();            //Señal de control de caudal
+  MoverMotor(Output);                 //Se manda la señal de control calculada al motor
 
 }
 
@@ -196,8 +202,7 @@ void eleccion() {
 
 // Subprograma que contiene el modo MANUAL
 void manual() {
-  int value = 0;
-
+  
   // read the pushbutton input pin:
   buttonState = digitalRead(botonUp);
   // compare the buttonState to its previous state
@@ -233,15 +238,13 @@ void manual() {
       Serial.println(buttonPushCounter);
       display.setBrightness(0x0f);
       display.showNumberDec(buttonPushCounter, false);
+
+      referencia_V = buttonPushCounter * 5; //(0 - 20) --> (0 - 100)    // MARCA LA REFERENCIA
     }
     delay(50);
   }
   // save the current state as the last state, for next time through the loop
   ultimo_estadoDown = estado_botonDown;
-
-
-
-  MoverMotor(buttonPushCounter);
 }
 
 
@@ -259,12 +262,8 @@ void automatico() {
   if (analogRead(Labjack) > 0.1 && value != lastValue) {
     //Se toman las referencias a partir del Labjack
     valor = analogRead(Labjack); //0-5V
-    Serial.println("Labjack funsionando papi");
-    Serial.println();
-    Serial.print("El valor introducido es: ");
-    Serial.println(valor);
 
-    MoverMotor(valor);
+    referencia_V = map(valor, 0,1023, 0,100);      //(0 - 5) --> (0 - 100)    // MARCA LA REFERENCIA
 
   } else {
 
@@ -274,17 +273,7 @@ void automatico() {
       float valor = str.toFloat();
 
       if (valor >= 0 && valor <= 100) {
-
-        //Mover_motor
-        MostrarPantalla(valor);
-        MoverMotorSerial(valor);
-
-
-
-        Serial.println();
-        Serial.print("El valor introducido es: ");
-
-        Serial.println(valor);
+          referencia_V = valor;                    //(0 - 100)    // MARCA LA REFERENCIA
       }
     }
   }
@@ -311,24 +300,10 @@ void MostrarPantalla(float valor) {
 }
 
 
-//  Subprograma para el movimiento del motor en modo manual
-void MoverMotor(float valor) {
-
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  if (valor == 0) {
-    analogWrite(en1, valor);
-  } else {
-    valor = map(valor, 0, 27.4, 4.4, 22);
-    valor = map(valor, 4.4, 25.4, 37.4, 255);
-    analogWrite(en1, valor);
-  }
-
-
   //  Subprograma para el movimiento del motor en modo automático, por el puerto serie
-}
 
-void MoverMotorSerial(float valor) {
+
+void MoverMotor(float valor) {
 
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
@@ -336,14 +311,13 @@ void MoverMotorSerial(float valor) {
   valor = map(valor, 0, 100, 0, 255);
   analogWrite(en1, valor);
 
-
 }
 
 
 
 //  Función para realizar la lectura del caudalímetro contador y asociarla al caudal correspondiente
 //Pendiente, asociar valor de frecuencia con el caudal correspondiente
-float leerCaudal() {
+double leerCaudal() {
   
   tiempoo = millis();
 
@@ -380,7 +354,7 @@ float leerCaudal() {
 
 //  Subprograma que lee el voltaje enviado el motor, a través del divisor de tensión para adaptarla
 //  al rango de entrada del puerto analógico del arduino
-float leerVoltaje() {
+double leerVoltaje() {
   
   tiempo = millis();
   V = analogRead(A5);
