@@ -7,7 +7,7 @@
 #include <PID_v1.h>
 /////////////////////////////////////////////
 
-const int Vmax = 20;
+const int Vmax = 30;
 
 // Se asocian los pines con su función
 //  Motor
@@ -35,28 +35,28 @@ const int Labjack = A4;     // Entrada del Labjack para controlar el motor (0-10
 /////////////////////////////////////////////////////////////////
 #define CLK 11                                              /////
 #define DIO 10                                              /////
-                                                            /////
+/////
 const uint8_t SEG_MAN[] = {                                 /////
   SEG_E | SEG_F | SEG_A | SEG_B | SEG_C,                    // M
-  SEG_F | SEG_A | SEG_B | SEG_C | SEG_E,                    // 
+  SEG_F | SEG_A | SEG_B | SEG_C | SEG_E,                    //
   SEG_C | SEG_E | SEG_G | SEG_F | SEG_A | SEG_B,            // A
   SEG_F | SEG_A | SEG_E | SEG_F | SEG_B | SEG_C,            // N
 };                                                          /////
-                                                            /////
+/////
 const uint8_t SEG_AUTO[] = {                                /////
   SEG_C | SEG_E | SEG_G | SEG_F | SEG_A | SEG_B,            // A
   SEG_E | SEG_F | SEG_D | SEG_B | SEG_C,                    // U
   SEG_A | SEG_B | SEG_C,                                    // T
   SEG_A | SEG_E | SEG_F | SEG_B | SEG_C | SEG_D,            // O
 };                                                          /////
-                                                            /////
+/////
 const uint8_t SEG_OCHO[] = {                                /////
   SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
   SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
   SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
   SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,    // 8
 };                                                          /////
-                                                            /////
+/////
 TM1637Display display(CLK, DIO);                            /////
 /////////////////////////////////////////////////////////////////
 
@@ -80,8 +80,15 @@ int variacion;
 
 
 //  Lectura Voltaje
-int lectura_Voltaje = A5;
-float V;
+
+int V;
+int nlecturas=1;
+int voltaje[100];
+int suma;
+float Vmedio;
+
+
+
 
 
 //  Sólo se ejecuta una vez, establece la configuración inicial
@@ -99,12 +106,12 @@ void setup() {
 
 
   display.clear(); //Limpia la pantalla
-  display.setBrightness(0x0f); 
+  display.setBrightness(0x0f);
   display.setSegments(SEG_OCHO);
   delay(1);
-  
-  if(digitalRead(interruptor == 1)){    //Para que si el sistema se inicia en modo AUTO
-     ultimo_estado = 1;                 //el ultimo_estado lo refleje y represente el 8888.
+
+  if (digitalRead(interruptor == 1)) {  //Para que si el sistema se inicia en modo AUTO
+    ultimo_estado = 1;                 //el ultimo_estado lo refleje y represente el 8888.
   }
 }
 
@@ -115,9 +122,9 @@ void loop() {
   // ELECCIÓN MANUAL - AUTOMÁTICO
   eleccion();
   //f=leerCaudal();
-  
+
   leerVoltaje();
-  
+
 }
 
 
@@ -126,24 +133,24 @@ void loop() {
 //  Procedimiento que lee el estado del interruptor y lleva el programa al modo AUTO o MANUAL
 void eleccion() {
 
-  
+
   estado_interruptor = digitalRead(interruptor);
 
   if (estado_interruptor == HIGH) {
     //Entonces el interruptor está en modo AUTOMÁTICO
-    if(ultimo_estado != estado_interruptor){
+    if (ultimo_estado != estado_interruptor) {
       display.setSegments(SEG_AUTO);
-    }                                                             
+    }
     automatico();
-    
+
   } else {
     //Entonces el interruptor está en modo MANUAL
     manual();
-    if(ultimo_estado != estado_interruptor){
+    if (ultimo_estado != estado_interruptor) {
       display.setSegments(SEG_MAN);
-    }                          
+    }
   }
-  
+
   ultimo_estado = estado_interruptor;
 }
 
@@ -153,8 +160,8 @@ void eleccion() {
 // Subprograma que contiene el modo MANUAL
 void manual() {
   int value = 0;
-  
-    // read the pushbutton input pin:
+
+  // read the pushbutton input pin:
   buttonState = digitalRead(botonUp);
   // compare the buttonState to its previous state
   if (buttonState != lastButtonState) {
@@ -165,11 +172,11 @@ void manual() {
       Serial.println("on");
       Serial.print("number of button pushes: ");
       Serial.println(buttonPushCounter);
-      
-      display.setBrightness(0x0f); 
-      display.showNumberDec(buttonPushCounter,false);
-      
-    } 
+
+      display.setBrightness(0x0f);
+      display.showNumberDec(buttonPushCounter, false);
+
+    }
     // Delay a little bit to avoid bouncing
     delay(50);
   }
@@ -188,16 +195,16 @@ void manual() {
       Serial.print("number of button pushes: ");
       Serial.println(buttonPushCounter);
       display.setBrightness(0x0f);
-      display.showNumberDec(buttonPushCounter,false); 
-    } 
-    delay(50);    
+      display.showNumberDec(buttonPushCounter, false);
+    }
+    delay(50);
   }
   // save the current state as the last state, for next time through the loop
   ultimo_estadoDown = estado_botonDown;
 
 
-    
-    MoverMotor(buttonPushCounter);
+
+  MoverMotor(buttonPushCounter);
 }
 
 
@@ -209,37 +216,37 @@ void automatico() {
   int value = 0;
   int lastValue = 0;
 
-  
-  
+
+
   value = analogRead(Labjack);
   if (analogRead(Labjack) > 0.1 && value != lastValue) {
     //Se toman las referencias a partir del Labjack
     valor = analogRead(Labjack); //0-5V
     Serial.println("Labjack funsionando papi");
     Serial.println();
-    Serial.print("El valor introducido es: ");   
+    Serial.print("El valor introducido es: ");
     Serial.println(valor);
-    
+
     MoverMotor(valor);
 
-  } else { 
-  
+  } else {
+
     if (Serial.available() > 0) {
       Serial.println("Introduzca un valor de 0 - 1024 (resolución de la salida analog) ");
       String str = Serial.readStringUntil('\n'); //lectura de la entrada de varios dígitos
       float valor = str.toFloat();
 
-      if (valor>=0 && valor <=100){
+      if (valor >= 0 && valor <= 100) {
 
         //Mover_motor
         MostrarPantalla(valor);
         MoverMotorSerial(valor);
 
 
-    
+
         Serial.println();
-        Serial.print("El valor introducido es: ");   
-    
+        Serial.print("El valor introducido es: ");
+
         Serial.println(valor);
       }
     }
@@ -250,68 +257,68 @@ void automatico() {
 
 
 //  Subprograma para la representación en pantalla de números reales con hasta dos decimales
-void MostrarPantalla(float valor){
+void MostrarPantalla(float valor) {
 
   int entera = 0;
   int decimal = 0;
 
   //Ajuste de número real para separarlo en dos enteros de parte real e imaginaria
   entera = (int)(valor);
-  decimal = round(100 * (valor - entera)); 
+  decimal = round(100 * (valor - entera));
 
   //Representación en pantalla del número real
-    display.clear(); //Limpia la pantalla
-    display.setBrightness(0x0f); 
-    display.showNumberDecEx(entera,(0x80 >> 1),false,2,0); 
-    display.showNumberDecEx(decimal,(0x80 >> 1),false,2,2); 
+  display.clear(); //Limpia la pantalla
+  display.setBrightness(0x0f);
+  display.showNumberDecEx(entera, (0x80 >> 1), false, 2, 0);
+  display.showNumberDecEx(decimal, (0x80 >> 1), false, 2, 2);
 }
 
 
 //  Subprograma para el movimiento del motor en modo manual
-void MoverMotor(float valor){
+void MoverMotor(float valor) {
 
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
-  if(valor == 0){
-    analogWrite(en1,valor);
-  }else{
+  if (valor == 0) {
+    analogWrite(en1, valor);
+  } else {
     valor = map(valor, 0, 27.4, 4.4, 22);
     valor = map(valor, 4.4, 25.4, 37.4, 255);
-    analogWrite(en1,valor);
+    analogWrite(en1, valor);
   }
 
-  
-//  Subprograma para el movimiento del motor en modo automático, por el puerto serie
+
+  //  Subprograma para el movimiento del motor en modo automático, por el puerto serie
 }
 
-void MoverMotorSerial(float valor){
+void MoverMotorSerial(float valor) {
 
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
 
-    valor = map(valor, 0, 100, 0, 28);
-    valor = map(valor, 0, 28, 0, 255);
-    analogWrite(en1,valor);
-  
-  
+  valor = map(valor, 0, 100, 0, 28);
+  valor = map(valor, 0, 28, 0, 255);
+  analogWrite(en1, valor);
+
+
 }
 
 
 //  Función para realizar la lectura del caudalímetro contador y asociarla al caudal correspondiente
-float leerCaudal(){
+float leerCaudal() {
   float frecuencia;
-  
 
-  tiempo=millis();
 
-  estado=digitalRead(caudalimetro);
+  tiempo = millis();
 
-  
-  if(estado == HIGH && estado != ultimo_estadoo){
+  estado = digitalRead(caudalimetro);
+
+
+  if (estado == HIGH && estado != ultimo_estadoo) {
     Serial.println("Hola");
-    
+
     variacion = tiempo - ultimo_tiempo;
-    frecuencia = 1/variacion;
+    frecuencia = 1 / variacion;
 
     Serial.print("freq:");
     Serial.println(frecuencia);
@@ -324,40 +331,40 @@ float leerCaudal(){
   }
   ultimo_estadoo = estado;
   ultimo_tiempo = tiempo;
+
   
-  
+
+
   return frecuencia;
-  
+
 }
 
 //  Subprograma que lee el voltaje enviado el motor, a través del divisor de tensión para adaptarla
 //  al rango de entrada del puerto analógico del arduino
 
-void leerVoltaje(){
-int voltaje[5];
 
-  tiempo=millis();
+void leerVoltaje() {
+  
 
-  if(tiempo - ultimo_tiempo > 10){
-
-      V=analogRead(A5);
-
-      if( V != 0 && V != 1023){
-       
-      }
-
-  if(tiempo - ultimo_tiempo > 1000){
-    
+  tiempo = millis();
+  V = analogRead(A5);
+  if(nlecturas <= 100){
+    if ( V != 0 && V != 1023) {
+      voltaje[nlecturas] = analogRead(A5);  //Se almacenan las lecturas tomadas durante un ms
+      nlecturas++;   
+    }
+  }else{  //Se han tomado y almacenado las medidas
+    suma=0; //Cálculo de la media de las medidas tomadas en el intervalo
+    for(i=0; i<nlecturas; i++){ 
+      suma=suma+voltaje[i];
+    }
+    Vmedio = suma/nlecturas;
+    Vmedio = Vmedio * (Vmax/1023);  //Se pasa de bits a Voltios, Vmax cambia en función del valor máximo
   }
-      
-      if( V != 0 && V != 1023){
-        Serial.print("Voltaje enviado al motor: ");
-        Serial.println(V);
-      
+      if (tiempo - ultimo_tiempo > 1000) {
+       Serial.print("Voltaje enviado al motor: ");
+       Serial.println(Vmedio);
       }
-      
-//(V <800 || V> 850)&&
-      ultimo_tiempo = tiempo;
-  }
-
+   
+    ultimo_tiempo = tiempo;
 }
