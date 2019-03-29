@@ -5,74 +5,30 @@ clc;
 
 Vanterior = 0;
 %% Acquire and analyze data
-
-
 A = 3;
 %% Connect to Arduino
 % Use the arduino command to connect to an Arduino device.
 
 a = arduino('/dev/ttyUSB1','Uno','Trace',true);
 
-%% Take a single measurement
-v = readVoltage(a,'A2');
-
     writeDigitalPin(a,'D7',1);
     writeDigitalPin(a,'D4',0);
 
 
-%% Record and plot 10 seconds of data
 
+
+%% Acquire and display live data
 ii = 0;
 V = zeros(1e4,1);
 t = zeros(1e4,1);
 
 tic
-X=0;
-while toc < 10
-    ii = ii + 1;
-    % Read current voltage value
-    v = readVoltage(a,'A2');
-    V(ii) = v;
-    % Get time since starting
-    t(ii) = toc;
-    
-    
-    writePWMVoltage(a,'D3',X);
-    
-     if (X < 4.8)
-        X=X+0.1;
-    else
-        X=0;
-    end
-end
-
-% Post-process and plot the data. First remove any excess zeros on the
-% logging variables.
-V = V(1:ii);
-t = t(1:ii);
-% Plot data versus time
-figure
-plot(t,V,'-o')
-xlabel('Elapsed time (sec)')
-ylabel('Voltage')
-title('Ten Seconds of Voltage Data')
-set(gca,'xlim',[t(1) t(ii)])
-
-%% Compute acquisition rate
-
-timeBetweenDataPoints = diff(t);
-averageTimePerDataPoint = mean(timeBetweenDataPoints);
-dataRateHz = 1/averageTimePerDataPoint;
-fprintf('Acquired one data point per %.3f seconds (%.f Hz)\n',...
-    averageTimePerDataPoint,dataRateHz)
-
-%% Acquire and display live data
 
 figure
 h = animatedline;
 ax = gca;
 ax.YGrid = 'on';
-ax.YLim = [-1 6];
+ax.YLim = [-0.1 2];
 
 stop = false;
 startTime = datetime('now');
@@ -80,36 +36,42 @@ startTime = datetime('now');
 
 
 X=0;
-%TIEMPO=0;
+TIEMPO=0;
 while ~stop
 
-%if (TIEMPO < 20)
-%   X=1
-%end
-%if (TIEMPO < 40 && TIEMPO> 20)
-%   X = 2
-%end
-% if (TIEMPO < 60 && TIEMPO> 40)
-%    X = 3
-% end
-% TIEMPO = TIEMPO + 0.1
+if (TIEMPO < 10)
+   X=1
+end
+if (TIEMPO < 20 && TIEMPO> 10)
+   X = 1.3
+end
+ if (TIEMPO < 30 && TIEMPO> 20)
+    X = 1.6
+ end
+ if (TIEMPO < 40 && TIEMPO> 35)
+    X = 2
+ end
+  if (TIEMPO < 45 && TIEMPO> 40)
+    X = 3
+  end
+  if (TIEMPO < 50 && TIEMPO> 45)
+    X = 4
+  end
+  if (TIEMPO < 55 && TIEMPO> 50)
+    X = 5
+  end
+  if ( TIEMPO> 55)
+    stop = 1;
+ end
+     
+     
+ TIEMPO = TIEMPO + 0.1
 
-
-    
-     if (X < 4.5)
-        X=X+0.05;
-     else
-        X=0;
-     end
     
     writePWMVoltage(a,'D3',X);
     % Read current voltage value
     v = readVoltage(a,'A2');
-    if(v < 4.7 && v ~= 0)
-        V =v;    
-    else
-        V=Vanterior;
-    end
+    V = curva(v);
     
     % Get current time
     t =  datetime('now') - startTime;

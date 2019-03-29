@@ -1,6 +1,6 @@
 
-//  Programa para el control de la bomba en bucle cerrado
 
+//  Programa para el control de la bomba en bucle cerrado
 //  Inclusión de todas las librerías necesarias
 #include <Arduino.h>
 #include <TM1637Display.h>
@@ -8,7 +8,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //Definición e inicialización de variables
-const int Vmax = 30;
+const int Vmax = 24;
 
 // Se asocian los pines con su función
 //  Motor
@@ -72,18 +72,19 @@ int estadoo = 0;
 int tiempoo = 0;
 int ultimo_estadoo = 0;
 int ultimo_tiempoo = 0;
-float frecuencia;   //Variable que almacena la lectura instantánea del voltaje
-float F[100];       //Almacena el valor de frecuencia para las nmedidas   
+double frecuencia;   //Variable que almacena la lectura instantánea del voltaje
+double F[20];       //Almacena el valor de frecuencia para las nmedidas   
 double Fmedia;      //Frecuencia media de las nlecturas
 
 //  Lectura Voltaje
 
 int tiempo;
 int ultimo_tiempo;
-int V;            //Variable que almacena la lectura instantánea del voltaje
+double V;            //Variable que almacena la lectura instantánea del voltaje
 int nlecturas=1;  //Almacena el número de lecturas (100 lecturas)
-int voltaje[100]; //Almacena el valor de V para las nlecturas   
+int voltaje[20]; //Almacena el valor de V para las nlecturas   
 double Vmedio;    //Voltaje medio de las nlecturas
+double voltaje_V[20];
 
 //
 double salida_V = 0; //Salida del sensor del voltaje enviado al motor
@@ -91,7 +92,7 @@ double salida_Q = 0; //Salida del sensor del caudal propulsado
 
 //  Variables auxiliares que se comparten en distintos subprogramas
 int i;
-float suma;
+double suma;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -120,6 +121,8 @@ void setup() {
 
   if (digitalRead(interruptor == 1)) {  //Para que si el sistema se inicia en modo AUTO
     ultimo_estado = 1;                  //el ultimo_estado lo refleje y represente el 8888.
+  }else{
+    ultimo_estado = 0;
   }
 
 }
@@ -132,8 +135,10 @@ void loop() {
   eleccion();
   
   
-  //salida_Q = leerCaudal();            //Medida del caudal
-  //salida_V = leerVoltaje();           //Medida del voltaje enviado al motor
+  //leerCaudal();            //Medida del caudal
+  //leerVoltaje();           //Medida del voltaje enviado al motor
+
+  
 
   //MostrarPantallaOscilante(double salida_Q, salida_V); //Que vaya cambiando la pantalla entre mostrar caudal y voltaje enviado.
 
@@ -318,17 +323,18 @@ void MoverMotorSerial(float valor) {
 
 //  Función para realizar la lectura del caudalímetro contador y asociarla al caudal correspondiente
 //Pendiente, asociar valor de frecuencia con el caudal correspondiente
-float leerCaudal() {
+void leerCaudal() {
   
   tiempoo = millis();
 
   estadoo = digitalRead(caudalimetro);
+  Serial.println(estadoo);
   if (estadoo == HIGH && estadoo != ultimo_estadoo) { //Cada vez que completa una vuelta se cumple la condición
-                                                      //Lectura instantánea del caudal
-    frecuencia = 1/(1000*(tiempoo - ultimo_tiempoo)); //Se calcula la frecuencia de rotación en Hz
+    
+    frecuencia = double(1/(1000*(tiempoo - ultimo_tiempoo))); //Se calcula la frecuencia de rotación en Hz
   }
   
-  if(nmedidas <= 100){                                //Media de las últimas N medidas
+  if(nmedidas < 20){                                //Media de las últimas N medidas
     F[nmedidas] = frecuencia;
     nmedidas++;
   }else{
@@ -338,9 +344,9 @@ float leerCaudal() {
     }
     Fmedia = suma/nmedidas;
     nmedidas = 0;
-  }
 
-  if (tiempo - ultimo_tiempo > 1000) {  //Representación en pantalla
+  }
+  if (tiempoo - ultimo_tiempoo > 1000) {  //Representación en pantalla
     Serial.print("Caudal: ");
     Serial.println(Fmedia);
   }
@@ -348,30 +354,42 @@ float leerCaudal() {
   ultimo_estadoo = estadoo;
   ultimo_tiempoo = tiempoo;
 
-  return Fmedia;
 }
 
 
 
 //  Subprograma que lee el voltaje enviado el motor, a través del divisor de tensión para adaptarla
 //  al rango de entrada del puerto analógico del arduino
-float leerVoltaje() {
+void leerVoltaje() {
   
   tiempo = millis();
-  V = analogRead(A5);
-  if(nlecturas <= 100){
-    if ( V != 0 && V != 1023) {
-      voltaje[nlecturas] = V;       //Se almacenan las lecturas tomadas durante un ms
-      nlecturas++;   
+  V = analogRead(A2);
+  if(nlecturas < 20){
+    //Serial.print("N de lecturas: ");
+    //Serial.println(nlecturas);
+    //delay(1);
+    if ( V > 0 && V < 1023) {
+      voltaje[nlecturas] = V;     
+      nlecturas++;  
+    }else{
+        voltaje[nlecturas] = voltaje[nlecturas-1];
     }
-  }else{                            //Se han tomado y almacenado las N medidas
+  }else{
+    //Se han tomado y almacenado las N medidas
     suma=0;                         //Cálculo de la media de las medidas tomadas en el intervalo
-    for(i=0; i<nlecturas; i++){ 
-      suma=suma+voltaje[i];
+    for(i=0; i<nlecturas; i++){
+      voltaje_V[i] = double(voltaje[i] * Vmax/860);
+      suma=suma+voltaje_V[i];
+      //Serial.print("Suma:");
+      //Serial.println(suma);
     }
     Vmedio = suma/nlecturas;
-    Vmedio = Vmedio * (Vmax/1023);  //Se pasa de bits a Voltios, Vmax cambia en función del valor máximo
+    Vmedio = (Vmedio -24 +1) *-1;
+    Serial.print("Voltaje medio = ");
+    Serial.println(Vmedio);
     nlecturas = 0;                  //Se resetea el contador de lecturas realizadas
+
+    delay(500);
   }
   
   if (tiempo - ultimo_tiempo > 1000) {  //Representación en pantalla
@@ -380,6 +398,4 @@ float leerVoltaje() {
   }
    
     ultimo_tiempo = tiempo;
-
-    return Vmedio;
 }
