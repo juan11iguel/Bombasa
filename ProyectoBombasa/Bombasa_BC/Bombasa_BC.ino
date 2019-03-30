@@ -3,6 +3,7 @@
 
 //  Inclusión de todas las librerías necesarias
 #include <Arduino.h>
+#include <math.h>
 #include <TM1637Display.h>
 #include <PID_v1.h>
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +33,39 @@ int buttonPushCounter = 0;  // Contador de número de pulsaciones (subir suma, b
 
 //  Modo automático
 const int Labjack = A4;     // Entrada del Labjack para controlar el motor (0-1023) bits -> (0 - 5) V
+
+//  Interruptor MANUAL - AUTOMÁTICO
+const int interruptor = 2;
+int estado_interruptor = 0;
+
+
+ 
+
+// Interpreteción del voltaje que da el caudalímetro en caudal
+double calibracionCaudalimetro(double x);
+
+// Ajuste polinomial de los parámetros del sistema en base al punto de operación
+//ganancia
+double ganancia(double x);
+//constante de tiempo
+double cteTiempo(double x);
+
+//  Controlador
+double Input = 0;
+double Output;
+double Setpoint;
+
+//Parámetros del controlador de caudal.  PARALELO
+double Kp_Q;
+double Ki_Q;
+
+
+PID ControlCaudal(&Input, &Output, &Setpoint,Kp_Q,Ki_Q,0, DIRECT);
+
+//  Variables auxiliares que se comparten en distintos subprogramas
+int i;
+float suma;
+
 
 
 //Pantalla 7 segmentos 4 dígitos/////////////////////////////////
@@ -63,53 +97,6 @@ const uint8_t SEG_OCHO[] = {                                /////
 TM1637Display display(CLK, DIO);                            /////
 /////////////////////////////////////////////////////////////////
 
-//  Interruptor MANUAL - AUTOMÁTICO
-const int interruptor = 2;
-int estado_interruptor = 0;
-
-//  Lectura Caudal
-const int caudalimetro = 8;
-int nmedidas = 0;   //Almacena el número de lecturas (100 lecturas)
-int estadoo = 0;
-int tiempoo = 0;
-int ultimo_estadoo = 0;
-int ultimo_tiempoo = 0;
-float frecuencia;   //Variable que almacena la lectura instantánea del voltaje
-float F[100];       //Almacena el valor de frecuencia para las nmedidas   
-double Fmedia;      //Frecuencia media de las nlecturas
-
-//  Lectura Voltaje
-double leerVoltaje();
-int tiempo;
-int ultimo_tiempo;
-int V;            //Variable que almacena la lectura instantánea del voltaje
-int nlecturas=1;  //Almacena el número de lecturas (100 lecturas)
-int voltaje[100]; //Almacena el valor de V para las nlecturas   
-double Vmedio;    //Voltaje medio de las nlecturas
-
-//  Controlador
-double salida_V = 0; //Salida del sensor del voltaje enviado al motor
-double salida_Q = 0; //Salida del sensor del caudal propulsado
-double sc_V;         //Señal de control para el voltaje
-double sc_Q;         //Señal de control para el caudal
-double referencia_V; //Referecia para el voltaje
-double referencia_Q; //Referencia para el caudal
-double Setpoint, Input, Output;
-//Parámetros del controlador de voltaje. PARALELO
-float Kp_V;
-float Ki_V;
-float Kd_V;
-//Parámetros del controlador de caudal.  PARALEO
-float Kp_Q;
-float Ki_Q;
-float Kd_Q;
-
-PID ControlVoltaje(&Input, &Output, &Setpoint,Kp_V,Ki_V,Kd_V, DIRECT);
-//PID ControlCaudal(&Input, &Output, &Setpoint,Kp_Q,Ki_Q,Kd_Q, DIRECT);
-
-//  Variables auxiliares que se comparten en distintos subprogramas
-int i;
-float suma;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,7 +111,6 @@ void setup() {
   pinMode(interruptor, INPUT);
   pinMode(botonUp, INPUT);
   pinMode(botonDown, INPUT);
-  pinMode(caudalimetro, INPUT);
 
   pinMode(en1, OUTPUT);
   pinMode(in1, OUTPUT);
@@ -140,11 +126,10 @@ void setup() {
     ultimo_estado = 1;                  //el ultimo_estado lo refleje y represente el 8888.
   }
 
-  ControlVoltaje.SetOutputLimits(0,100);
-  //ControlCaudal.SetOutputLimits(0,100);
+  ControlCaudal.SetOutputLimits(0,100);
   
-  ControlVoltaje.SetMode(AUTOMATIC);  //Activación de controladores
-  //ControlCaudal.SetMode(AUTOMATIC);   //Probablemente debería de ir dentro de elección para ver si activar o no el controlador
+  //Activación de controladores
+  ControlCaudal.SetMode(AUTOMATIC);   //Probablemente debería de ir dentro de elección para ver si activar o no el controlador
 }
 
 
@@ -153,20 +138,29 @@ void loop() {
 
   // ELECCIÓN MANUAL - AUTOMÁTICO
   eleccion();
-  
-  
-  //salida_Q = leerCaudal();          //Medida del caudal
-  salida_V = leerVoltaje();           //Medida del voltaje enviado al motor
 
   //MostrarPantallaOscilante(double salida_Q, salida_V); //Que vaya cambiando la pantalla entre mostrar caudal y voltaje enviado.
-  
-  Setpoint = referencia_V;
-  Input = salida_V;
-  
-  ControlVoltaje.Compute();           //Se calcula la señal de control de voltaje                     
-  //ControlCaudal.Compute();          //Señal de control de caudal
 
-  MoverMotor(Output);                 //Se manda la señal de control calculada al motor
+  
+  Input = leerCaudal();          //Medida del caudal
+
+  //Control adaptativo
+  
+  //Cálculo de los parámetros actuales del sistema
+  double k = ganancia(Input);
+  double tau = cteTiempo(Input);
+  
+  //Cálculo de los parámetros del controlador
+  Kp_Q = double(1/(0.8*k));  
+  Ki_Q = double(Kp_Q/tau);
+  
+  //Se actualizan los parámetros del controlador en la función
+  ControlCaudal.SetTunings(Kp_Q, Ki_Q, 0);
+  
+  //Se calcula la señal de control      
+  ControlCaudal.Compute();
+
+  MoverMotor(Output);                 
 
 }
 
@@ -239,7 +233,7 @@ void manual() {
       display.setBrightness(0x0f);
       display.showNumberDec(buttonPushCounter, false);
 
-      referencia_V = buttonPushCounter * 5; //(0 - 20) --> (0 - 100)    // MARCA LA REFERENCIA
+      Setpoint = buttonPushCounter * 5; //(0 - 20) --> (0 - 100)    // MARCA LA REFERENCIA
     }
     delay(50);
   }
@@ -263,7 +257,7 @@ void automatico() {
     //Se toman las referencias a partir del Labjack
     valor = analogRead(Labjack); //0-5V
 
-    referencia_V = map(valor, 0,1023, 0,100);      //(0 - 5) --> (0 - 100)    // MARCA LA REFERENCIA
+    Setpoint = map(valor, 0,1023, 0,100);      //(0 - 5) --> (0 - 100)    // MARCA LA REFERENCIA
 
   } else {
 
@@ -273,7 +267,7 @@ void automatico() {
       float valor = str.toFloat();
 
       if (valor >= 0 && valor <= 100) {
-          referencia_V = valor;                    //(0 - 100)    // MARCA LA REFERENCIA
+          Setpoint = valor;                    //(0 - 100)    // MARCA LA REFERENCIA
       }
     }
   }
@@ -318,67 +312,73 @@ void MoverMotor(float valor) {
 //  Función para realizar la lectura del caudalímetro contador y asociarla al caudal correspondiente
 //Pendiente, asociar valor de frecuencia con el caudal correspondiente
 double leerCaudal() {
+  double Qmedio = 0;
+  double leerCaudal();
+  int tiempo;
+  int ultimo_tiempo;
+  int Q;            //Variable que almacena la lectura instantánea del voltaje
+  int nlecturas=1;  //Almacena el número de lecturas (100 lecturas)
+  int caudal[20]; //Almacena el valor de V para las nlecturas  
   
-  tiempoo = millis();
-
-  estadoo = digitalRead(caudalimetro);
-  if (estadoo == HIGH && estadoo != ultimo_estadoo) { //Cada vez que completa una vuelta se cumple la condición
-                                                      //Lectura instantánea del caudal
-    frecuencia = 1/(1000*(tiempoo - ultimo_tiempoo)); //Se calcula la frecuencia de rotación en Hz
-  }
-  
-  if(nmedidas <= 100){                                //Media de las últimas N medidas
-    F[nmedidas] = frecuencia;
-    nmedidas++;
-  }else{
-    suma = 0;
-    for(i=0; i<nmedidas; i++){ 
-      suma=suma+F[i];
+  tiempo = millis();
+  Q = analogRead(A5);
+  if(nlecturas < 20){
+    
+      caudal[nlecturas] = Q;                    //Se almacenan las lecturas tomadas durante un ms
+      nlecturas++;   
+    
+  }else{                                        //Se han tomado y almacenado las N medidas
+    suma=0;                                     //Cálculo de la media de las medidas tomadas en el intervalo
+    for(i=0; i<nlecturas; i++){ 
+      suma=suma+caudal[i];
     }
-    Fmedia = suma/nmedidas;
-    nmedidas = 0;
+    double Vmedio = suma/nlecturas;
+    Qmedio =double(Vmedio * (5/1023));   //Se pasa de bits a Voltios
+    Qmedio = calibracionCaudalimetro(Qmedio);   //Se pasa de voltios a mL/min
+    nlecturas = 0;                              //Se resetea el contador de lecturas realizadas
   }
+ 
+    
+//  if (tiempo - ultimo_tiempo > 1000) {  //Representación en pantalla
+//    Serial.print("Voltaje enviado al motor: ");
+//    Serial.println(Vmedio);
+//  }
+   
+    ultimo_tiempo = tiempo;
 
-  if (tiempo - ultimo_tiempo > 1000) {  //Representación en pantalla
-    Serial.print("Caudal: ");
-    Serial.println(Fmedia);
-  }
-
-  ultimo_estadoo = estadoo;
-  ultimo_tiempoo = tiempoo;
-
-  return Fmedia;
+    return Qmedio;
 }
 
 
 
-//  Subprograma que lee el voltaje enviado el motor, a través del divisor de tensión para adaptarla
-//  al rango de entrada del puerto analógico del arduino
-double leerVoltaje() {
-  
-  tiempo = millis();
-  V = analogRead(A5);
-  if(nlecturas <= 100){
-    if ( V != 0 && V != 1023) {
-      voltaje[nlecturas] = V;       //Se almacenan las lecturas tomadas durante un ms
-      nlecturas++;   
-    }
-  }else{                            //Se han tomado y almacenado las N medidas
-    suma=0;                         //Cálculo de la media de las medidas tomadas en el intervalo
-    for(i=0; i<nlecturas; i++){ 
-      suma=suma+voltaje[i];
-    }
-    Vmedio = suma/nlecturas;
-    Vmedio = Vmedio * (Vmax/1023);  //Se pasa de bits a Voltios, Vmax cambia en función del valor máximo
-    nlecturas = 0;                  //Se resetea el contador de lecturas realizadas
-  }
-  
-  if (tiempo - ultimo_tiempo > 1000) {  //Representación en pantalla
-    Serial.print("Voltaje enviado al motor: ");
-    Serial.println(Vmedio);
-  }
-   
-    ultimo_tiempo = tiempo;
 
-    return Vmedio;
+double calibracionCaudalimetro(double x){
+  //En base a la calibración se obtiene el siguiente polinomio:
+  //  curva(x) = p1*x^2 + p2*x + p3
+  //con: 
+    double p1 = -7.361, p2 = 51.48, p3 =0.2817;
+
+    double caudal = p1*pow(x,2) + p2*x + p3;
+
+    return caudal;
+}
+
+double ganancia(double x){
+  //En base al ajuste de la curva punto de operación - ganancia estática se obtiene:
+  //y(x) = p1*x^4 + p2*x^3 + p3*x^2 + p4*x + p5
+  double p1 = 0.0004088, p2=-0.06596 , p3=3.92 , p4=-102.4 , p5=1010;
+  
+    double y= p1*pow(x,4) + p2*pow(x,3) + p3*pow(x,2) + p4*x + p5;
+    
+  return y;
+}
+
+double cteTiempo(double x){
+  //En base al ajuste de la curva punto de operación - cte de tiempo se obtiene:
+  //y(x) = p1*x^4 + p2*x^3 + p3*x^2 + p4*x + p5
+  double p1 = 6.876e-05, p2=-0.01448 , p3=1.06 , p4=-32.93 , p5=378.2;
+  
+    double y= p1*pow(x,4) + p2*pow(x,3) + p3*pow(x,2) + p4*x + p5;
+    
+  return y;
 }
