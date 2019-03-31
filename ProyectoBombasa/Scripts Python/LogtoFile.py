@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 ##############
 ## Script listens to serial port and writes contents into a file
 ##############
