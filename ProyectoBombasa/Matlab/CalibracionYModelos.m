@@ -2,6 +2,7 @@ clear all;
 clc
 
 addpath('~/Documents/Bombasa/ProyectoBombasa')
+addpath('~/Documents/Bombasa/ProyectoBombasa/Matlab')
 load Workspace.mat;
 
 

@@ -5,7 +5,7 @@
 ## requires pySerial to be installed 
 import serial
 
-serial_port = '/dev/ttyACM0';
+serial_port = '/dev/ttyUSB0';
 baud_rate = 9600; #In arduino, Serial.begin(baud_rate)
 write_to_file_path = "output.txt";
 
