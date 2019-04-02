@@ -56,6 +56,8 @@ double ganancia(double x);
 //constante de tiempo
 double cteTiempo(double x);
 
+void eleccion();
+
 //Parámetros de la planta
 double k = 0;
 double tau = 0;
@@ -178,28 +180,26 @@ void loop() {
 
   //Se calcula la señal de control
   ControlCaudal.Compute();
-  
+
   tiempo = millis();
   if (tiempo -  ultimo_tiempo > 1000) {  //Representación en pantalla
-    Serial.println("Señal de control: ");
+    //Serial.print("La referencia actual es: ");
+    Serial.println(Setpoint);
+    //Serial.println("S. Control: ");
     Serial.println(Output);
-    Serial.println("Salida: ");
+    //Serial.println("Salida: ");
     Serial.println(Input);
-    Serial.println("Ganancia Proporcional: ");
-    Serial.println(Kp_Q);
-    Serial.println("Ganancia Integral: ");
-    Serial.println(Ki_Q);
 
-    Serial.println(" ");
-    Serial.println(" ");
-    Serial.println(" ");
-    Serial.println(" ");
 
     ultimo_tiempo = tiempo;
   }
 
-  
-  MoverMotor(Output);
+  if (Setpoint == 0) {
+    MoverMotor(0);
+  } else {
+    MoverMotor(Output);
+  }
+
 
 }
 
@@ -316,8 +316,6 @@ void automatico() {
 
       if (valor >= 0 && valor <= QMAX) {
         Setpoint = valor;                    //(0 - QMAX)    // MARCA LA REFERENCIA
-        Serial.print("La referencia actual es: ");
-        Serial.println(Setpoint);
       }
     }
   }
@@ -352,7 +350,7 @@ void MoverMotor(float valor) {
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
 
-  valor = (float) valor * 255/Vmax;
+  valor = (float) valor * 255 / Vmax;
   analogWrite(en1, valor);
 
 }
