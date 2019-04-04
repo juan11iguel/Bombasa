@@ -10,7 +10,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //Definición e inicialización de variables
-const int Vmax = 30;
+const int Vmax = 24;
 const int QMAX = 60;
 
 // Se asocian los pines con su función
@@ -24,8 +24,8 @@ const int in2 = 4;      // Entrada lógica del driver para controlar el sentido 
 int ultimo_estado = 0;
 
 //  Modo manual
-const int botonUp = 13;     // Boton Subir (el de al lado de la pantalla)
-const int botonDown = 12;   // Boton Bajar (el de al lado de la pantalla)
+const int botonUp = 4;     // Boton Subir (el de al lado de la pantalla)
+const int botonDown = 5;   // Boton Bajar (el de al lado de la pantalla)
 int estado_botonDown = 0;   // Estado actual del botón bajar
 int buttonState = 0;        // Estado actual del botón subir
 int lastButtonState = 0;    // Estado anterior del botón subir
@@ -81,11 +81,13 @@ int i;
 float suma;
 
 
-
+void pantallaOscilante(double Input, double Output);
 //Pantalla 7 segmentos 4 dígitos/////////////////////////////////
 /////////////////////////////////////////////////////////////////
-#define CLK 11                                              /////
-#define DIO 10                                              /////
+#define CLK 7                                              /////
+#define DIO 6
+double ultiempodisplay = 0;
+double tiempodisplay = 0;/////
 /////
 const uint8_t SEG_MAN[] = {                                 /////
   SEG_E | SEG_F | SEG_A | SEG_B | SEG_C,                    // M
@@ -154,11 +156,9 @@ void loop() {
   // ELECCIÓN MANUAL - AUTOMÁTICO
   eleccion();
 
-  //MostrarPantallaOscilante(double salida_Q, salida_V); //Que vaya cambiando la pantalla entre mostrar caudal y voltaje enviado.
-
-
   Input = leerCaudal();          //Medida del caudal
-  //Serial.println(Input);
+
+ 
   //Control adaptativo
 
   //Cálculo de los parámetros actuales del sistema
@@ -170,7 +170,6 @@ void loop() {
     tau = cteTiempo(30);
   }
 
-
   //Cálculo de los parámetros del controlador
   Kp_Q = (double) 1 / (0.5 * k);
   Ki_Q = (double) Kp_Q / tau;
@@ -181,24 +180,29 @@ void loop() {
   //Se calcula la señal de control
   ControlCaudal.Compute();
 
-  tiempo = millis();
-  if (tiempo -  ultimo_tiempo > 1000) {  //Representación en pantalla
-    //Serial.print("La referencia actual es: ");
-    Serial.println(Setpoint);
-    //Serial.println("S. Control: ");
-    Serial.println(Output);
-    //Serial.println("Salida: ");
-    Serial.println(Input);
-
-
-    ultimo_tiempo = tiempo;
-  }
-
+  //Para prevenir que por ruido a la entrada cero se obtenga una salida distinta de cero
   if (Setpoint == 0) {
     MoverMotor(0);
   } else {
     MoverMotor(Output);
   }
+
+  // REGISTRO DE SALIDA, SEÑAL DE CONTROL, REFERENCIA
+  tiempo = millis();
+  if (tiempo -  ultimo_tiempo > 1000) {  //Representación en pantalla
+    Serial.print("La referencia actual es: ");
+    Serial.println(Setpoint);
+    Serial.print("Señal de control: ");
+    Serial.println(Output);
+    Serial.print("Salida: ");
+    Serial.println(Input);
+    Serial.println(" ");
+
+    ultimo_tiempo = tiempo;
+  }
+
+  //pantallaOscilante(Input, Output);
+
 
 
 }
@@ -302,9 +306,12 @@ void automatico() {
 
 
   value = analogRead(Labjack);
-  if (analogRead(Labjack) > 0.1 && value != lastValue) {
+  if (analogRead(Labjack) > 0.5 && value != lastValue) {
     //Se toman las referencias a partir del Labjack
     valor = analogRead(Labjack); //0-5V
+    
+    Serial.println("Labjack");
+    delay(500);
 
     Setpoint = map(valor, 0, 1023, 0, QMAX);    //(0 - 5) --> (0 - 100)    // MARCA LA REFERENCIA
 
@@ -376,7 +383,7 @@ void MoverMotorManual(float valor) {
 //Pendiente, asociar valor de frecuencia con el caudal correspondiente
 double leerCaudal() {
 
-  Q = analogRead(A5);
+  Q = analogRead(A3);
   if (nlecturas < 20) {
     caudal[nlecturas] = Q;                    //Se almacenan las lecturas tomadas durante un ms
     nlecturas++;
@@ -435,4 +442,16 @@ double cteTiempo(double x) {
   double y = p1 * pow(x, 4) + p2 * pow(x, 3) + p3 * pow(x, 2) + p4 * x + p5;
 
   return y;
+}
+
+void pantallaOscilante(double Input, double Output) {
+
+  tiempodisplay = millis();
+  if (tiempodisplay - ultiempodisplay < 2000) {
+    MostrarPantalla(Input);
+  } else if (tiempodisplay - ultiempodisplay > 2000 && tiempodisplay - ultiempodisplay < 3000 ) {
+    MostrarPantalla(Output);
+    ultiempodisplay = tiempodisplay;
+  }
+
 }
