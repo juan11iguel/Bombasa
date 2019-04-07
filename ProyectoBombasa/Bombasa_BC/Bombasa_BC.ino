@@ -175,7 +175,7 @@ void loop() {
   Ki_Q = (double) Kp_Q / tau;
 
   //Se actualizan los parámetros del controlador en la función
-  ControlCaudal.SetTunings(0.08, 0.3, 0);
+  ControlCaudal.SetTunings(0.09, 0.3, 0);
 
   //Se calcula la señal de control
   ControlCaudal.Compute();
@@ -306,14 +306,15 @@ void automatico() {
 
 
   value = analogRead(Labjack);
+  value = map(value, 0, 1023, 0, 5);    //(0 - 5) --> (0 - 100)    // MARCA LA REFERENCIA
   if (analogRead(Labjack) > 0.5 && value != lastValue) {
     //Se toman las referencias a partir del Labjack
-    valor = analogRead(Labjack); //0-5V
     
     Serial.println("Labjack");
     delay(500);
 
-    Setpoint = map(valor, 0, 1023, 0, QMAX);    //(0 - 5) --> (0 - 100)    // MARCA LA REFERENCIA
+    Setpoint = value;
+    
 
   } else {
 

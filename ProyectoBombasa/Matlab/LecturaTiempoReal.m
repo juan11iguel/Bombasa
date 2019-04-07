@@ -10,7 +10,7 @@ A = 3;
 %% Connect to Arduino
 % Use the arduino command to connect to an Arduino device.
 
-a = arduino('/dev/ttyUSB1','Uno','Trace',true);
+a = arduino('/dev/ttyUSB0','Uno','Trace',true);
 
     writeDigitalPin(a,'D7',1);
     writeDigitalPin(a,'D4',0);

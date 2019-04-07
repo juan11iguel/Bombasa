@@ -21,11 +21,11 @@ ArduinoSerial.write('5') # Manda valor al arduino que lo recibe mientras este en
 
 
 
-print ArduinoSerial.readline() #Imprime en pantalla cualquier cosa que se introduzca en el Arduino
+print (ArduinoSerial.readline()) #Imprime en pantalla cualquier cosa que se introduzca en el Arduino
 
 
 while 1: # Estara en este bucle siempre leyendo valores
-	print 'Introduzca un valor comprendido entre ',MIN, 'y ', 		MAX,': '
+	print ('Introduzca un valor comprendido entre ',MIN, 'y ', 		MAX,': ')
 	
 	var = input() 
 	ArduinoSerial.write(str(var))
