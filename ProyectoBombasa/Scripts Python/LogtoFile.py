@@ -41,16 +41,20 @@ plt.ion()
 # Definición de funciones
 #--------------------------------------------------------------------
 def procesarValor():
-	ser.write(b'g')
+	
 	nuevoPunto1 = ser.readline()
 	nuevoPunto2 = ser.readline()
 	nuevoPunto3 = ser.readline()
-
+	print(nuevoPunto1)
 	nuevoPunto1 = nuevoPunto1.decode().replace('\r\n', "")
 	nuevoPunto2 = nuevoPunto2.decode().replace('\r\n', "")
 	nuevoPunto3 = nuevoPunto3.decode().replace('\r\n', "")
+	
 
 	nuevoPunto = [nuevoPunto1, nuevoPunto2, nuevoPunto3]
+	for i in range(0, 3):
+		if(nuevopunto[i] == ''):
+			nuevoPunto[i] = 0
 	return nuevoPunto
 
 def representarValor():

@@ -10,7 +10,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 char userInput;
-
+double entrada;
 
 
 //Definición e inicialización de variables
@@ -21,15 +21,14 @@ const int QMAX = 60;
 //  Motor
 void MoverMotor(float valor);
 const int en1 = 3;      // PWM  Salida (0 - 255) bits -> (0 - 5) V
-const int in1 = 7;      // Entrada lógica del driver para controlar el sentido de giro del motor
-const int in2 = 4;      // Entrada lógica del driver para controlar el sentido de giro del motor
+
 
 //  Elección
 int ultimo_estado = 0;
 
 //  Modo manual
-const int botonUp = 13;     // Boton Subir (el de al lado de la pantalla)
-const int botonDown = 12;   // Boton Bajar (el de al lado de la pantalla)
+const int botonUp = 5;     // Boton Subir (el de al lado de la pantalla)
+const int botonDown = 9;   // Boton Bajar (el de al lado de la pantalla)
 int estado_botonDown = 0;   // Estado actual del botón bajar
 int buttonState = 0;        // Estado actual del botón subir
 int lastButtonState = 0;    // Estado anterior del botón subir
@@ -77,6 +76,7 @@ double Ki_Q;
 
 int ultimo_tiempo = 0;
 int tiempo;
+boolean centinela = true;
 
 PID ControlCaudal(&Input, &Output, &Setpoint, Kp_Q, Ki_Q, 0, DIRECT);
 
@@ -84,12 +84,10 @@ PID ControlCaudal(&Input, &Output, &Setpoint, Kp_Q, Ki_Q, 0, DIRECT);
 int i;
 float suma;
 
-
-
 //Pantalla 7 segmentos 4 dígitos/////////////////////////////////
 /////////////////////////////////////////////////////////////////
-#define CLK 11                                              /////
-#define DIO 10                                              /////
+#define CLK 7                                              /////
+#define DIO 6                                              /////
 /////
 const uint8_t SEG_MAN[] = {                                 /////
   SEG_E | SEG_F | SEG_A | SEG_B | SEG_C,                    // M
@@ -131,8 +129,7 @@ void setup() {
   pinMode(botonDown, INPUT);
 
   pinMode(en1, OUTPUT);
-  pinMode(in1, OUTPUT);
-  pinMode(in2, OUTPUT);
+
 
 
   display.clear();                      //Limpia la pantalla
@@ -186,18 +183,19 @@ void loop() {
   ControlCaudal.Compute();
 
   tiempo = millis();
-  if (tiempo -  ultimo_tiempo > 1000) {  //Representación en pantalla
-    if (Serial.available() > 0) {
-      double entrada = Serial.read();
-      if (entrada == 'g') {
-        Serial.print(Setpoint);
-        Serial.print(Output);
-        Serial.println(Input);
-      }
-    }
+  //if (tiempo -  ultimo_tiempo > 1000) {  //Representación en pantalla
+     
     
+     Serial.println(Setpoint);
+     Serial.println(Output);
+     Serial.println(Input);
+   //      }
+ 
+
+          
+   
     ultimo_tiempo = tiempo;
-  }
+  //}
 
   if (Setpoint == 0) {
     MoverMotor(0);
@@ -292,7 +290,7 @@ void manual() {
   ultimo_estadoDown = estado_botonDown;
 
   //buttonPushCounter = map(buttonPushCounter,0,20, 0, QMAX);
-  MoverMotorManual(buttonPushCounter);
+  //MoverMotorManual(buttonPushCounter);
 }
 
 
@@ -306,26 +304,29 @@ void automatico() {
 
 
 
-  value = analogRead(Labjack);
+  //value = analogRead(Labjack);
+  value = 0;
   value = map(value, 0, 1023, 0, QMAX);
   if (value > 0.5 && value != lastValue) {
     //Se toman las referencias a partir del Labjack
-
+    Serial.println("Labjack tocando los huevos");
     Setpoint = value;    //(0 - 5) --> (0 - 100)    // MARCA LA REFERENCIA
 
   } else {
 
     if (Serial.available() > 0) {
+       
       String str = Serial.readStringUntil('\n'); //lectura de la entrada de varios dígitos
-      float valor = str.toFloat();
+      valor = str.toDouble();
+      if(valor > 0 && valor <= QMAX){
 
-      if (valor >= 0 && valor <= QMAX) {
         Setpoint = valor;                    //(0 - QMAX)    // MARCA LA REFERENCIA
-      }
+       }
     }
   }
 
 }
+
 
 
 
@@ -352,36 +353,17 @@ void MostrarPantalla(float valor) {
 
 void MoverMotor(float valor) {
 
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-
   valor = (float) valor * 255 / Vmax;
   analogWrite(en1, valor);
 
 }
 
 
-void MoverMotorManual(float valor) {
-
-
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  if (valor == 0) {
-    analogWrite(en1, valor);
-  } else {
-    valor = map(valor, 0, 27.4, 4.4, 22);
-    valor = map(valor, 4.4, 25.4, 37.4, 255);
-    analogWrite(en1, valor);
-  }
-}
-
-
-
 //  Función para realizar la lectura del caudalímetro contador y asociarla al caudal correspondiente
 //Pendiente, asociar valor de frecuencia con el caudal correspondiente
 double leerCaudal() {
 
-  Q = analogRead(A5);
+  Q = analogRead(A3);
   if (nlecturas < 20) {
     caudal[nlecturas] = Q;                    //Se almacenan las lecturas tomadas durante un ms
     nlecturas++;
